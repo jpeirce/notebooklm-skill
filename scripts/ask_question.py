@@ -76,28 +76,33 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> s
         print("  🌐 Opening notebook...")
         page.goto(notebook_url, wait_until="domcontentloaded")
 
-        # Wait for NotebookLM
-        page.wait_for_url(re.compile(r"^https://notebooklm\.google\.com/"), timeout=10000)
-
         # Wait for query input (MCP approach)
         print("  ⏳ Waiting for query input...")
         query_element = None
 
-        for selector in QUERY_INPUT_SELECTORS:
-            try:
-                query_element = page.wait_for_selector(
-                    selector,
-                    timeout=10000,
-                    state="visible"  # Only check visibility, not disabled!
-                )
-                if query_element:
-                    print(f"  ✓ Found input: {selector}")
-                    break
-            except:
-                continue
+        # Give it a good amount of time to find the input, as NotebookLM can be slow
+        deadline = time.time() + 45 
+        while time.time() < deadline:
+            for selector in QUERY_INPUT_SELECTORS:
+                try:
+                    query_element = page.wait_for_selector(
+                        selector,
+                        timeout=2000,
+                        state="visible"
+                    )
+                    if query_element:
+                        print(f"  ✓ Found input: {selector}")
+                        break
+                except:
+                    continue
+            if query_element:
+                break
+            time.sleep(1)
 
         if not query_element:
             print("  ❌ Could not find query input")
+            # For debugging, let's see where we are
+            print(f"  Current URL: {page.url}")
             return None
 
         # Type question (human-like, fast)
