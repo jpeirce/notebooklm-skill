@@ -1,6 +1,6 @@
 ---
 name: notebooklm
-description: Use this skill to query your Google NotebookLM notebooks directly from Claude Code for source-grounded, citation-backed answers from Gemini. Browser automation, library management, persistent auth. Drastically reduced hallucinations through document-only responses.
+description: Use this skill to query your Google NotebookLM notebooks directly from your AI agent for source-grounded, citation-backed answers from Gemini.
 ---
 
 # NotebookLM Research Assistant Skill
@@ -125,11 +125,7 @@ python scripts/run.py ask_question.py --question "..." --notebook-url "https://.
 python scripts/run.py ask_question.py --question "..." --show-browser
 ```
 
-## Follow-Up Mechanism (CRITICAL)
-
-Every NotebookLM answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need to know?"**
-
-**Required Claude Behavior:**
+## Required Agent Behavior:
 1. **STOP** - Do not immediately respond to user
 2. **ANALYZE** - Compare answer to user's original request
 3. **IDENTIFY GAPS** - Determine if more information needed
@@ -137,8 +133,6 @@ Every NotebookLM answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need 
    ```bash
    python scripts/run.py ask_question.py --question "Follow-up with context..."
    ```
-5. **REPEAT** - Continue until information is complete
-6. **SYNTHESIZE** - Combine all answers before responding to user
 
 ## Script Reference
 
@@ -190,7 +184,7 @@ python -m patchright install chromium
 
 ## Data Storage
 
-All data stored in `~/.claude/skills/notebooklm/data/`:
+All data stored in `data/`:
 - `library.json` - Notebook metadata
 - `auth_info.json` - Authentication status
 - `browser_state/` - Browser cookies and session
