@@ -12,10 +12,11 @@ See: https://github.com/microsoft/playwright/issues/36139
 import argparse
 import sys
 import time
+import asyncio
 import re
 from pathlib import Path
 
-from patchright.sync_api import sync_playwright
+from patchright.async_api import async_playwright
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -37,7 +38,7 @@ FOLLOW_UP_REMINDER = (
 )
 
 
-def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> str:
+async def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> str:
     """
     Ask a question to NotebookLM
 
@@ -52,32 +53,33 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> s
     auth = AuthManager()
 
     if not auth.is_authenticated():
-        print("⚠️ Not authenticated. Run: python auth_manager.py setup")
-        return None
+        msg = "Error: Not authenticated. Run: python auth_manager.py setup"
+        print(f"[WARN] {msg}")
+        return msg
 
-    print(f"💬 Asking: {question}")
-    print(f"📚 Notebook: {notebook_url}")
+    print(f"Asking: {question}")
+    print(f"Notebook: {notebook_url}")
 
     playwright = None
     context = None
 
     try:
         # Start playwright
-        playwright = sync_playwright().start()
+        playwright = await async_playwright().start()
 
         # Launch persistent browser context using factory
-        context = BrowserFactory.launch_persistent_context(
+        context = await BrowserFactory.launch_persistent_context_async(
             playwright,
             headless=headless
         )
 
         # Navigate to notebook
-        page = context.new_page()
-        print("  🌐 Opening notebook...")
-        page.goto(notebook_url, wait_until="domcontentloaded")
+        page = await context.new_page()
+        print("  Opening notebook...")
+        await page.goto(notebook_url, wait_until="domcontentloaded")
 
         # Wait for query input (MCP approach)
-        print("  ⏳ Waiting for query input...")
+        print("  Waiting for query input...")
         query_element = None
 
         # Give it a good amount of time to find the input, as NotebookLM can be slow
@@ -85,42 +87,41 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> s
         while time.time() < deadline:
             for selector in QUERY_INPUT_SELECTORS:
                 try:
-                    query_element = page.wait_for_selector(
+                    query_element = await page.wait_for_selector(
                         selector,
                         timeout=2000,
                         state="visible"
                     )
                     if query_element:
-                        print(f"  ✓ Found input: {selector}")
+                        print(f"  * Found input: {selector}")
                         break
                 except:
                     continue
             if query_element:
                 break
-            time.sleep(1)
+            await asyncio.sleep(1)
 
         if not query_element:
-            print("  ❌ Could not find query input")
-            # For debugging, let's see where we are
-            print(f"  Current URL: {page.url}")
-            return None
+            msg = f"Error: Could not find query input. Current URL: {page.url}"
+            print(f"  [ERROR] {msg}")
+            return msg
 
         # Type question (human-like, fast)
-        print("  ⏳ Typing question...")
+        print("  Typing question...")
         
         # Use primary selector for typing
         input_selector = QUERY_INPUT_SELECTORS[0]
-        StealthUtils.human_type(page, input_selector, question)
+        await StealthUtils.human_type_async(page, input_selector, question)
 
         # Submit
-        print("  📤 Submitting...")
-        page.keyboard.press("Enter")
+        print("  Submitting...")
+        await page.keyboard.press("Enter")
 
         # Small pause
-        StealthUtils.random_delay(500, 1500)
+        await StealthUtils.random_delay_async(500, 1500)
 
         # Wait for response (MCP approach: poll for stable text)
-        print("  ⏳ Waiting for answer...")
+        print("  Waiting for answer...")
 
         answer = None
         stable_count = 0
@@ -130,9 +131,9 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> s
         while time.time() < deadline:
             # Check if NotebookLM is still thinking (most reliable indicator)
             try:
-                thinking_element = page.query_selector('div.thinking-message')
-                if thinking_element and thinking_element.is_visible():
-                    time.sleep(1)
+                thinking_element = await page.query_selector('div.thinking-message')
+                if thinking_element and await thinking_element.is_visible():
+                    await asyncio.sleep(1)
                     continue
             except:
                 pass
@@ -140,11 +141,11 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> s
             # Try to find response with MCP selectors
             for selector in RESPONSE_SELECTORS:
                 try:
-                    elements = page.query_selector_all(selector)
+                    elements = await page.query_selector_all(selector)
                     if elements:
                         # Get last (newest) response
                         latest = elements[-1]
-                        text = latest.inner_text().strip()
+                        text = (await latest.inner_text()).strip()
 
                         if text:
                             if text == last_text:
@@ -161,33 +162,35 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True) -> s
             if answer:
                 break
 
-            time.sleep(1)
+            await asyncio.sleep(1)
 
         if not answer:
-            print("  ❌ Timeout waiting for answer")
-            return None
+            msg = "Error: Timeout waiting for answer"
+            print(f"  [ERROR] {msg}")
+            return msg
 
-        print("  ✅ Got answer!")
+        print("  [SUCCESS] Got answer!")
         # Add follow-up reminder to encourage Claude to ask more questions
         return answer + FOLLOW_UP_REMINDER
 
     except Exception as e:
-        print(f"  ❌ Error: {e}")
+        msg = f"Error: {e}"
+        print(f"  [ERROR] {msg}")
         import traceback
         traceback.print_exc()
-        return None
+        return msg
 
     finally:
         # Always clean up
         if context:
             try:
-                context.close()
+                await context.close()
             except:
                 pass
 
         if playwright:
             try:
-                playwright.stop()
+                await playwright.stop()
             except:
                 pass
 
@@ -211,7 +214,7 @@ def main():
         if notebook:
             notebook_url = notebook['url']
         else:
-            print(f"❌ Notebook '{args.notebook_id}' not found")
+            print(f"[ERROR] Notebook '{args.notebook_id}' not found")
             return 1
 
     if not notebook_url:
@@ -220,30 +223,30 @@ def main():
         active = library.get_active_notebook()
         if active:
             notebook_url = active['url']
-            print(f"📚 Using active notebook: {active['name']}")
+            print(f"Using active notebook: {active['name']}")
         else:
             # Show available notebooks
             notebooks = library.list_notebooks()
             if notebooks:
-                print("\n📚 Available notebooks:")
+                print("\nAvailable notebooks:")
                 for nb in notebooks:
                     mark = " [ACTIVE]" if nb.get('id') == library.active_notebook_id else ""
                     print(f"  {nb['id']}: {nb['name']}{mark}")
                 print("\nSpecify with --notebook-id or set active:")
                 print("python scripts/run.py notebook_manager.py activate --id ID")
             else:
-                print("❌ No notebooks in library. Add one first:")
+                print("No notebooks in library. Add one first:")
                 print("python scripts/run.py notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS")
             return 1
 
     # Ask the question
-    answer = ask_notebooklm(
+    answer = asyncio.run(ask_notebooklm(
         question=args.question,
         notebook_url=notebook_url,
         headless=not args.show_browser
-    )
+    ))
 
-    if answer:
+    if answer and not answer.startswith("Error:"):
         print("\n" + "=" * 60)
         print(f"Question: {args.question}")
         print("=" * 60)
@@ -253,7 +256,7 @@ def main():
         print("=" * 60)
         return 0
     else:
-        print("\n❌ Failed to get answer")
+        print(f"\n[ERROR] {answer}")
         return 1
 
 

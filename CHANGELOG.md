@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-12-24
+
+### Added
+- **Async/Await Architecture** - Migrated core interaction logic to `asyncio` and `patchright.async_api`
+  - Eliminates "Playwright Sync API inside asyncio loop" errors
+  - Improved concurrency handling for modern agent environments
+- **Windows Compatibility** - Full support for Windows environments
+  - UTF-8 encoding enforcement for `mcp_server.py` to handle emojis on Windows terminals
+  - Path handling improvements
+
+### Changed
+- **Error Handling** - `ask_question.py` now returns descriptive error strings instead of `None`
+  - Allows agents to see *why* a query failed (Timeout, Auth, Selector not found)
+  - `mcp_server.py` correctly propagates these errors to the client
+- **Process Robustness** - Improved stability when running as a long-lived MCP server
+
 ## [1.3.0] - 2025-11-21
 
 ### Added

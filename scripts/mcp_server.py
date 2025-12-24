@@ -1,7 +1,12 @@
 from mcp.server.fastmcp import FastMCP
 from typing import List, Optional
 import sys
+import io
 from pathlib import Path
+
+# Force UTF-8 encoding for stdout/stderr on Windows to handle emojis
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Add the scripts directory to the python path so we can import our modules
 sys.path.insert(0, str(Path(__file__).parent))
@@ -13,7 +18,7 @@ from ask_question import ask_notebooklm
 mcp = FastMCP("NotebookLM Skill")
 
 @mcp.tool()
-def query_notebook(question: str, notebook_id: Optional[str] = None) -> str:
+async def query_notebook(question: str, notebook_id: Optional[str] = None) -> str:
     """
     Ask a question to a Google NotebookLM notebook.
     
@@ -38,12 +43,12 @@ def query_notebook(question: str, notebook_id: Optional[str] = None) -> str:
         
     # Ask the question
     # Note: We run headless by default for the MCP server
-    answer = ask_notebooklm(question, notebook_url, headless=True)
+    answer = await ask_notebooklm(question, notebook_url, headless=True)
     
     if answer:
         return answer
     else:
-        return "Error: Failed to get an answer from NotebookLM. Please check the logs or try again."
+        return "Error: Failed to get an answer (Server Updated). Check logs."
 
 @mcp.tool()
 def list_notebooks() -> str:

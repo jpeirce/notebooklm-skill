@@ -15,9 +15,9 @@
 ## 🚀 Why This Fork?
 
 The original tool was designed specifically for "Claude Code" on macOS/Linux. This fork extends the functionality to be:
-1.  **Windows Compatible:** Optimized paths and environment handling for Windows.
+1.  **Windows Compatible:** Optimized paths, environment handling, and UTF-8 encoding for Windows.
 2.  **Agent Agnostic:** Works with **Gemini CLI**, standard Python scripts, or any tool that can run shell commands.
-3.  **More Robust:** Increased timeouts and better error handling for the NotebookLM web interface (which can be slow).
+3.  **More Robust:** Increased timeouts, better error handling, and **Async Architecture** for modern agent loops.
 4.  **Flexible Auth:** Supports manual cookie injection for when automated browser login fails.
 
 ---

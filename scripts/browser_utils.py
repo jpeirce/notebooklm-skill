@@ -9,6 +9,7 @@ import random
 from typing import Optional, List
 
 from patchright.sync_api import Playwright, BrowserContext, Page
+from patchright.async_api import Playwright as AsyncPlaywright, BrowserContext as AsyncBrowserContext, Page as AsyncPage
 from config import BROWSER_PROFILE_DIR, STATE_FILE, BROWSER_ARGS, USER_AGENT
 
 
@@ -43,6 +44,32 @@ class BrowserFactory:
         return context
 
     @staticmethod
+    async def launch_persistent_context_async(
+        playwright: AsyncPlaywright,
+        headless: bool = True,
+        user_data_dir: str = str(BROWSER_PROFILE_DIR)
+    ) -> AsyncBrowserContext:
+        """
+        Async version: Launch a persistent browser context with anti-detection features
+        and cookie workaround.
+        """
+        # Launch persistent context
+        context = await playwright.chromium.launch_persistent_context(
+            user_data_dir=user_data_dir,
+            channel="chrome",  # Use real Chrome
+            headless=headless,
+            no_viewport=True,
+            ignore_default_args=["--enable-automation"],
+            user_agent=USER_AGENT,
+            args=BROWSER_ARGS
+        )
+
+        # Cookie Workaround
+        await BrowserFactory._inject_cookies_async(context)
+
+        return context
+
+    @staticmethod
     def _inject_cookies(context: BrowserContext):
         """Inject cookies from state.json if available"""
         if STATE_FILE.exists():
@@ -55,6 +82,18 @@ class BrowserFactory:
             except Exception as e:
                 print(f"  ⚠️  Could not load state.json: {e}")
 
+    @staticmethod
+    async def _inject_cookies_async(context: AsyncBrowserContext):
+        """Async version: Inject cookies from state.json if available"""
+        if STATE_FILE.exists():
+            try:
+                with open(STATE_FILE, 'r') as f:
+                    state = json.load(f)
+                    if 'cookies' in state and len(state['cookies']) > 0:
+                        await context.add_cookies(state['cookies'])
+            except Exception as e:
+                print(f"  ⚠️  Could not load state.json: {e}")
+
 
 class StealthUtils:
     """Human-like interaction utilities"""
@@ -63,6 +102,12 @@ class StealthUtils:
     def random_delay(min_ms: int = 100, max_ms: int = 500):
         """Add random delay"""
         time.sleep(random.uniform(min_ms / 1000, max_ms / 1000))
+
+    @staticmethod
+    async def random_delay_async(min_ms: int = 100, max_ms: int = 500):
+        """Async version: Add random delay"""
+        import asyncio
+        await asyncio.sleep(random.uniform(min_ms / 1000, max_ms / 1000))
 
     @staticmethod
     def human_type(page: Page, selector: str, text: str, wpm_min: int = 320, wpm_max: int = 480):
@@ -89,6 +134,28 @@ class StealthUtils:
                 time.sleep(random.uniform(0.15, 0.4))
 
     @staticmethod
+    async def human_type_async(page: AsyncPage, selector: str, text: str, wpm_min: int = 320, wpm_max: int = 480):
+        """Async version: Type with human-like speed"""
+        import asyncio
+        element = await page.query_selector(selector)
+        if not element:
+            try:
+                element = await page.wait_for_selector(selector, timeout=2000)
+            except:
+                pass
+        
+        if not element:
+            print(f"⚠️ Element not found for typing: {selector}")
+            return
+
+        await element.click()
+        
+        for char in text:
+            await element.type(char, delay=random.uniform(25, 75))
+            if random.random() < 0.05:
+                await asyncio.sleep(random.uniform(0.15, 0.4))
+
+    @staticmethod
     def realistic_click(page: Page, selector: str):
         """Click with realistic movement"""
         element = page.query_selector(selector)
@@ -105,3 +172,20 @@ class StealthUtils:
         StealthUtils.random_delay(100, 300)
         element.click()
         StealthUtils.random_delay(100, 300)
+
+    @staticmethod
+    async def realistic_click_async(page: AsyncPage, selector: str):
+        """Async version: Click with realistic movement"""
+        element = await page.query_selector(selector)
+        if not element:
+            return
+
+        box = await element.bounding_box()
+        if box:
+            x = box['x'] + box['width'] / 2
+            y = box['y'] + box['height'] / 2
+            await page.mouse.move(x, y, steps=5)
+
+        await StealthUtils.random_delay_async(100, 300)
+        await element.click()
+        await StealthUtils.random_delay_async(100, 300)
